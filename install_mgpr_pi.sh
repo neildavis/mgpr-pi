@@ -1,5 +1,27 @@
 #!/bin/env bash
 
+# MIT License
+
+# Copyright (c) 2023 Neil Davis
+
+# Permission is hereby granted, free of charge, to any person obtaining a copy
+# of this software and associated documentation files (the "Software"), to deal
+# in the Software without restriction, including without limitation the rights
+# to use, copy, modify, merge, publish, distribute, sublicense, and/or sell
+# copies of the Software, and to permit persons to whom the Software is
+# furnished to do so, subject to the following conditions:
+
+# The above copyright notice and this permission notice shall be included in all
+# copies or substantial portions of the Software.
+
+# THE SOFTWARE IS PROVIDED "AS IS", WITHOUT WARRANTY OF ANY KIND, EXPRESS OR
+# IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY,
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
+# SOFTWARE.
+
 swap_mb_required=1024 # Min 1GB swap is recommended to compile box86
 
 box86_repo="https://github.com/ptitSeb/box86.git"
@@ -15,7 +37,7 @@ badown_dir="${HOME}/code/badown"
 debian_package_mirror="ftp.us.debian.org/debian/"
 
 mgpr_linux_tar_gz_url="https://www.mediafire.com/file/0c68v3eb4m4wgbd/mgpr_v1_4_6_linux_04_04_2016.tar.gz"
-mgpr_dest_dir="${HOME}/mgpr_v1_4_6_linux" # Path for mgpr. Last component MUST match TLD of mgpr tarball
+mgpr_dest_dir="${HOME}/mgpr_v1_4_6_linux" # Path for mgpr.
 mgpr_launch_sh="${HOME}/bin/mgpr.sh"      # Path of mgpr launch script
 
 # These lines affect the mgpr config file generated in mgpr's 'cfg' dir
@@ -89,7 +111,8 @@ else
 fi
 if [[ ! -d "${mgpr_dest_dir}" ]]; then
   echo "Extracting ${mgpr_tar_gz_dest} ..."
-  tar -xf "${mgpr_tar_gz_dest}"
+  mkdir -p "${mgpr_dest_dir}"
+  tar -xf "${mgpr_tar_gz_dest}" --strip-components=1 --directory "${mgpr_dest_dir}"
   #rm "${mgpr_tar_gz_dest}"
 fi
 if [[ ! -f "${mgpr_dest_dir}/mgpr" ]]; then
@@ -113,7 +136,7 @@ if [[ $(ls -l "${mgpr_dest_dir}"/*.so* | wc -l) -eq 0 ]]; then
   for deb in "${mgpr_dest_dir}"/debs/*; do
     dpkg -x "${deb}" "${mgpr_dest_dir}"/debs
   done
-  find "${mgpr_dest_dir}" -name *.so* -print0 | xargs -0 mv -t "${mgpr_dest_dir}"
+  find "${mgpr_dest_dir}/debs" -name *.so* -print0 | xargs -0 mv -t "${mgpr_dest_dir}"
   rm -rf "${mgpr_dest_dir}"/debs
 else 
   echo "i386 pkg dependencies for mgpr have already been fetched"
@@ -138,7 +161,12 @@ mkdir -p $(dirname "${mgpr_launch_sh}")
 echo "Creating MGPR launch script"
 cat <<EOF > "${mgpr_launch_sh}"
 #!/bin/env bash
-XINITRC=${mgpr_dest_dir}/.xinitrc xinit -- :0 -quiet vt\$XDG_VTNR 
+if [ -n "\$DISPLAY" ]; then
+  cd "${mgpr_dest_dir}"
+  ./mgpr -cfg $mgpr_cfg_name
+else
+  XINITRC=${mgpr_dest_dir}/.xinitrc xinit -- :0 -quiet vt\$XDG_VTNR 
+fi
 EOF
   chmod a+x "${mgpr_launch_sh}"
 # else
