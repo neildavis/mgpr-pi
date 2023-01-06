@@ -28,6 +28,10 @@ amazing game on their Pis.
 
 ## Limitations ##
 
+* Only Raspberry Pi 2, 3 & 4 models are currently supported with 1GB or more of RAM.
+The original Pi and Pi Zero use an ARM chip that cannot be used by box86's 'DynaRec' (dynamic recompiler)
+so performance would suffer.
+The Pi Zero 2 may work, but the 512 MB RAM is likely to be a problem building box86 and I don't have one to test on.
 * Currently this script supports only 32-bit versions of Raspberry Pi OS.
 * It has only been tested against the 'Bullseye' release.
 * It requires the use of the KMS GL driver to get playable performance.
@@ -42,7 +46,7 @@ e.g. it will increase the size of the
 
 I do not claim to be an expert in Linux/Raspberry Pi OS. This works for me, but I am unable to test this script with every combination of hardware & software environment.
 It's possible that I have made an error that will cause unrecoverable damage to your Pi system image and leave it 'bricked'.
-I will not be held responsible for any loss resulting in the use of this script, as per the conditions
+I will not be held responsible for any loss resulting from the use of this script, as per the conditions
 contained in the [LICENSE](LICENSE). I encourage you to read and understand the script contents prior to running it.
 
 I **do not** recommend you use this script if you have valuable data on your Pi and/or the Pi is already in use for
@@ -59,7 +63,7 @@ The following steps should be done **BEFORE** using the script to prepare your P
 These assume a fresh install of Raspberry Pi OS 'Bullseye' Lite edition.
 Your Pi must also have internet access for this whole process.
 
-1. If you have 1GB or less of RAM (all Pis pre v4), reduce the GPU share to 64MB:
+1. If your Pi has 1GB of RAM or less (all Pis pre v4), reduce the GPU share to 64MB:
 
      `sudo raspi-config` -> Performance Options -> GPU Memory
 
@@ -178,6 +182,8 @@ BOX86_LOG=1 ./mgpr
 1. Add support for box86 under 64-bit Raspberry Pi OS.
 2. Try using [box64](https://github.com/ptitSeb/box64) on 64-bit OS using the x64 Linux `mgpr` binary.
 3. Make configuration more friendly. Perhaps interactive?
+4. Add support for Pi Zero 2 by building box86 for RPi3 and/or forking box86 to add (-DRPIZ2) support.
+5. Dynamically adjust the `make -j` argument to take into account available RAM.
 
 ## Contributing ##
 

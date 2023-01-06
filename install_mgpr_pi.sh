@@ -8,14 +8,15 @@ box86_build_dir="${HOME}/code/box86"
 
 badown_repo="https://github.com/stck-lzm/badown.git"  # to help download from mediafire
 badown_ver="master"
-badown_dir="${HOME}/badown"
+badown_dir="${HOME}/code/badown"
 
 # Change this to your local Debian mirror for faster downloads
 # https://www.debian.org/mirror/list
 debian_package_mirror="ftp.us.debian.org/debian/"
 
 mgpr_linux_tar_gz_url="https://www.mediafire.com/file/0c68v3eb4m4wgbd/mgpr_v1_4_6_linux_04_04_2016.tar.gz"
-mgpr_dest_dir="${HOME}/mgpr_v1_4_6_linux" # last path component MUST match TLD of mgpr tarball
+mgpr_dest_dir="${HOME}/mgpr_v1_4_6_linux" # Path for mgpr. Last component MUST match TLD of mgpr tarball
+mgpr_launch_sh="${HOME}/bin/mgpr.sh"      # Path of mgpr launch script
 
 # These lines affect the mgpr config file generated in mgpr's 'cfg' dir
 mgpr_cfg_name="nn"            # The name of the configuration file.
@@ -30,6 +31,8 @@ mgpr_cfg_playfield_pos_y=0    # if TATE mode is applied this will become x pos
 # These lines affect the .xinitrc file generated to run mgpr under X11 from the CLI console. 
 mgpr_display_output_id="HDMI-1" # Change to 'DSI-1' if using DSI display (e.g. official 7" touch screen)
 mgpr_display_rotate="normal"    # Change to 'inverted' to rotate the screen 180 degrees in TATE mode.
+
+script_dir="${PWD}"
 
 # Install the build environment
 echo "Installing build tools and dependenices ..."
@@ -62,7 +65,7 @@ if [[ ! -f "${box86_build_dir}/box86" ]]; then
   make -j$(nproc)
   sudo make install
   sudo systemctl restart systemd-binfmt
-  cd "${HOME}"
+  cd "${script_dir}"
 else
   echo "Skipping box86 build. Already built"
 fi
@@ -118,30 +121,29 @@ fi
 
 # Create .xinitrc for launching mgpr from CLI
 mgpr_xinit_rc="${mgpr_dest_dir}/.xinitrc"
-if [[ ! -f "${mgpr_xinit_rc}" ]]; then
+# if [[ ! -f "${mgpr_xinit_rc}" ]]; then
 echo "Creating MGPR .xinitrc script"
 cat <<EOF > "${mgpr_xinit_rc}"
 cd "${mgpr_dest_dir}"
 DISPLAY=:0 xrandr --output ${mgpr_display_output_id} --rotate ${mgpr_display_rotate}
 ./mgpr -cfg $mgpr_cfg_name
 EOF
-else
-  echo "MGPR .xinitrc ${mgpr_dest_dir}/.xinitrc already exists"
-fi
+# else
+#   echo "MGPR .xinitrc ${mgpr_dest_dir}/.xinitrc already exists"
+# fi
 
 # Create user scripts to launch
-mkdir -p "${HOME}"/bin
-mgpr_launch_sh="${HOME}/bin/mgpr.sh"
-if [[ ! -f "${mgpr_launch_sh}" ]]; then
+mkdir -p $(dirname "${mgpr_launch_sh}")
+# if [[ ! -f "${mgpr_launch_sh}" ]]; then
 echo "Creating MGPR launch script"
 cat <<EOF > "${mgpr_launch_sh}"
 #!/bin/env bash
 XINITRC=${mgpr_dest_dir}/.xinitrc xinit -- :0 -quiet vt\$XDG_VTNR 
 EOF
   chmod a+x "${mgpr_launch_sh}"
-else
-  echo "MGPR launch script ${HOME}/bin/mgpr.sh already exists"
-fi
+# else
+#   echo "MGPR launch script ${HOME}/bin/mgpr.sh already exists"
+# fi
 
 # Create MGPR config
 echo "Creating MGPR cfg (${mgpr_dest_dir}/cfg/$mgpr_cfg_name)"
@@ -324,4 +326,4 @@ GAMEPLAY attract_mode_hiscore yes
 GAMEPLAY end_game_you_placed no
 GAMEPLAY end_game_stats no
 EOF
-cd "${HOME}"
+cd "${script_dir}"
