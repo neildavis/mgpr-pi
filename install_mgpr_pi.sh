@@ -41,7 +41,7 @@ mgpr_dest_dir="${HOME}/mgpr_v1_4_6_linux" # Path for mgpr.
 mgpr_launch_sh="${HOME}/bin/mgpr.sh"      # Path of mgpr launch script
 
 # These lines affect the mgpr config file generated in mgpr's 'cfg' dir
-mgpr_cfg_name="nn"            # The name of the configuration file.
+mgpr_cfg_name="nn.cfg"            # The name of the configuration file.
 mgpr_cfg_display_width=800    # if TATE mode is applied this will become height
 mgpr_cfg_display_height=480   # if TATE mode is applied this will become width
 mgpr_cfg_fullscreen=yes       # Change to 'no' to disable fullscreen use (e.g. when running in a desktop window)
@@ -149,7 +149,7 @@ echo "Creating MGPR .xinitrc script"
 cat <<EOF > "${mgpr_xinit_rc}"
 cd "${mgpr_dest_dir}"
 DISPLAY=:0 xrandr --output ${mgpr_display_output_id} --rotate ${mgpr_display_rotate}
-./mgpr -cfg $mgpr_cfg_name
+./mgpr -cfg "\${MGPR_CFG}"
 EOF
 # else
 #   echo "MGPR .xinitrc ${mgpr_dest_dir}/.xinitrc already exists"
@@ -163,8 +163,13 @@ cat <<EOF > "${mgpr_launch_sh}"
 #!/bin/env bash
 if [ -n "\$DISPLAY" ]; then
   cd "${mgpr_dest_dir}"
-  ./mgpr -cfg $mgpr_cfg_name
+  ./mgpr -cfg "${mgpr_cfg_name}"
 else
+  MGPR_CFG="\$1"
+  if [[ -z "\${MGPR_CFG}" ]]; then
+    MGPR_CFG="${mgpr_cfg_name}"
+  fi
+  export MGPR_CFG
   XINITRC=${mgpr_dest_dir}/.xinitrc xinit -- :0 -quiet vt\$XDG_VTNR 
 fi
 EOF

@@ -2,7 +2,7 @@
 
 ## Play Monaco GP Remake on a Raspberry Pi ##
 
-[![Video](https://img.youtube.com/vi/X4zbBv5r75I/maxresdefault.jpg)](https://www.youtube.com/watch?v=X4zbBv5r75I)
+[![Video](https://img.youtube.com/vi/LI3msMjCAkY/maxresdefault.jpg)](https://www.youtube.com/watch?v=LI3msMjCAkY)
 
 ## Overview ##
 
