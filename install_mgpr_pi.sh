@@ -22,11 +22,16 @@
 # OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN THE
 # SOFTWARE.
 
-swap_mb_required=1024 # Min 1GB swap is recommended to compile box86
+swap_mb_required=1024 # Min 1GB swap is recommended to compile box86/box64. May be raised below if < 4GB physical RAM
 
 box86_repo="https://github.com/ptitSeb/box86.git"
 box86_ver="v0.2.8"
 box86_build_dir="${HOME}/code/box86"
+box86_make_jobs_concurrent=1  # make -j param. Will be set to $(nproc) if you have 4GB+ RAM
+box64_repo="https://github.com/ptitSeb/box64.git"
+box64_ver="main" # Until a new release tag is made
+box64_build_dir="${HOME}/code/box64"
+box64_make_jobs_concurrent=1  # make -j param. Will be set to $(nproc) if you have 4GB+ RAM
 
 badown_repo="https://github.com/stck-lzm/badown.git"  # to help download from mediafire
 badown_ver="master"
@@ -48,48 +53,164 @@ mgpr_cfg_fullscreen=yes       # Change to 'no' to disable fullscreen use (e.g. w
 mgpr_cfg_tate_mode=yes        # TATE mode rotates the game to play in portrait making better use of screen space.
 mgpr_cfg_playfield_width=640  # if TATE mode is applied this will become height
 mgpr_cfg_playfield_height=480 # if TATE mode is applied this will become width
-mgpr_cfg_playfield_pos_x=60   # if TATE mode is applied this will become y pos
+mgpr_cfg_playfield_pos_x=80   # if TATE mode is applied this will become y pos
 mgpr_cfg_playfield_pos_y=0    # if TATE mode is applied this will become x pos
 # These lines affect the .xinitrc file generated to run mgpr under X11 from the CLI console. 
 mgpr_display_output_id="HDMI-1" # Change to 'DSI-1' if using DSI display (e.g. official 7" touch screen)
 mgpr_display_rotate="normal"    # Change to 'inverted' to rotate the screen 180 degrees in TATE mode.
 
+
+# Helper func to determine if we're running on a 64-bit system
+is_arm64() {
+  [[ $(uname -m) == "aarch64" ]]
+}
+
 script_dir="${PWD}"
+
+# Check compatibility. We only support 'numbered' RPi revisions, i.e. 2, 3 & 4
+rpi_version=$(grep -Po 'Raspberry Pi \K[[:digit:]+](?= Model)' /proc/cpuinfo)
+if [[ -z "${rpi_version}" ]]; then
+  echo "Only RPi 2,3 & 4 devices are supported"
+  exit 1
+fi
+mem_phys_total_mb=$(($(cat /proc/meminfo | grep MemTotal | awk '{print $2}')/1024))
+if [[ $mem_phys_total_mb -gt 3000 ]]; then
+  # 4GB+ RAM allows multiple concurrent builds up to CPU core count
+  box86_make_jobs_concurrent=$(nproc)
+  box64_make_jobs_concurrent=$(nproc)
+else
+  swap_mb_required=2048 # 2 GB swap required if < 4 GB RAM
+fi
+echo "${mem_phys_total_mb} MB RAM. ${swap_mb_required} MB swap required"
+
+if is_arm64; then
+  mgpr_linux_build_dir="static_64bit"
+  deb_pkg_arch="amd64"
+  rpi_arch="64-bit"
+ else
+  mgpr_linux_build_dir="static_32bit"
+  deb_pkg_arch="i386"
+  rpi_arch="32-bit"
+fi
+echo "Installing on Raspberry Pi ${rpi_version} (${rpi_arch}) with ${mem_phys_total_mb} MB RAM (Total)"
 
 # Install the build environment
 echo "Installing build tools and dependenices ..."
 sudo apt -y install git build-essential cmake xinit x11-xserver-utils libpulse0 gawk \
-  libegl1-mesa-dev  libgles2-mesa-dev libgl1-mesa-dev libgbm-dev libdrm-dev
+  libegl1-mesa-dev  libgles2-mesa-dev libgl1-mesa-dev libgbm-dev libdrm-dev \
 
-# Sort out swap file
-source /etc/dphys-swapfile
-if [ $CONF_SWAPSIZE -lt $swap_mb_required ]; then 
-  echo "Swap size ${CONF_SWAPSIZE} MB is insufficient. Raising to 1024 MB"
+set_swap_file_size() {
+  source /etc/dphys-swapfile
+  echo "Setting swap file size to ${1}"
   sudo dphys-swapfile swapoff
-  sudo sed -i 's/CONF_SWAPSIZE='"${CONF_SWAPSIZE}"'/CONF_SWAPSIZE='"${swap_mb_required}"'/g' /etc/dphys-swapfile   
+  sudo sed -i 's/CONF_SWAPSIZE='"${CONF_SWAPSIZE}"'/CONF_SWAPSIZE='"${1}"'/g' /etc/dphys-swapfile   
   sudo dphys-swapfile setup
   sudo dphys-swapfile swapon
-else 
-  echo "Swap size ${CONF_SWAPSIZE} MB is sufficient"
+}
+
+source /etc/dphys-swapfile
+conf_swapsize_orig=$CONF_SWAPSIZE
+
+set_swap_file_size_for_box_build() {
+  if [ $CONF_SWAPSIZE -lt $swap_mb_required ]; then 
+    echo "Swap size ${CONF_SWAPSIZE} MB is insufficient. "
+    set_swap_file_size $swap_mb_required
+  else 
+    echo "Swap size ${CONF_SWAPSIZE} MB is sufficient"
+  fi
+}
+
+build_box86() {
+  if [[ ! -d "${box86_build_dir}" ]]; then
+    echo "Fetching box86 version ${box86_ver} from ${box86_repo}"
+    mkdir -p "${box86_build_dir}"
+    git -c advice.detachedHead=false clone --depth=1 -b "${box86_ver}" "${box86_repo}" "${box86_build_dir}"
+  fi
+  if [[ ! -f "${box86_build_dir}/box86" ]]; then
+    # Sort out swap file for building box86
+    set_swap_file_size_for_box_build
+    cd "${box86_build_dir}"
+    box86_rpi_build_flag="-DRPI${rpi_version}=1"
+    box86_rpi_make_flag="-j${box86_make_jobs_concurrent}"
+    echo "Building box86 with ${box86_rpi_build_flag} and make ${box86_rpi_make_flag} ..."
+    cmake . "${box86_rpi_build_flag}" -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    make "${box86_rpi_make_flag}"
+    cd "${script_dir}"
+  else
+    echo "Skipping box86 build. Already built"
+  fi
+}
+
+install_box86() {
+  # Let's install box86
+  which_box86=$(which box86)
+  if [[ -z "${which_box86}" ]]; then
+    echo "box86 is not installed"
+    # Build box86
+    build_box86
+    # Install box86
+    echo "Installing box86"
+    cd "${box86_build_dir}"
+    sudo make install
+    sudo systemctl restart systemd-binfmt
+    cd "${script_dir}"
+  else 
+    echo "box86 is already installed at ${which_box86}"
+  fi
+}
+
+build_box64() {
+  if [[ ! -d "${box64_build_dir}" ]]; then
+    echo "Fetching box64 version ${box64_ver} from ${box64_repo}"
+    mkdir -p "${box64_build_dir}"
+    git -c advice.detachedHead=false clone --depth=1 -b "${box64_ver}" "${box64_repo}" "${box64_build_dir}"
+  fi
+  if [[ ! -f "${box64_build_dir}/box64" ]]; then
+    # Sort out swap file for building box64
+    set_swap_file_size_for_box_build
+    cd "${box64_build_dir}"
+    box64_rpi_build_flag="-DRPI${rpi_version}ARM64=1"
+    box64_rpi_make_flag="-j${box64_make_jobs_concurrent}"
+    echo "Building box64 with ${box64_rpi_build_flag} and make ${box64_rpi_make_flag} ..."
+    cmake . "${box64_rpi_build_flag}" -DCMAKE_BUILD_TYPE=RelWithDebInfo
+    make "${box64_rpi_make_flag}"
+    cd "${script_dir}"
+  else
+    echo "Skipping box64 build. Already built"
+  fi
+}
+
+install_box64() {
+  # Let's install box64
+  which_box64=$(which box64)
+  if [[ -z "${which_box64}" ]]; then
+    echo "box64 is not installed"
+    # build box64 
+    build_box64
+    #install box64
+    echo "Installing box64"
+    cd "${box64_build_dir}"
+    sudo make install
+    sudo systemctl restart systemd-binfmt
+    cd "${script_dir}"
+  else 
+    echo "box64 is already installed at ${which_box64}"
+  fi
+}
+
+if is_arm64; then
+  install_box64
+else
+  install_box86
 fi
 
-# Let's build box86
-if [[ ! -d "${box86_build_dir}" ]]; then
-  echo "Fetching box86 version ${box86_ver} from ${box86_repo}"
-  mkdir -p "${box86_build_dir}"
-  git -c advice.detachedHead=false clone --depth=1 -b "${box86_ver}" "${box86_repo}" "${box86_build_dir}"
-fi
-if [[ ! -f "${box86_build_dir}/box86" ]]; then
-  cd "${box86_build_dir}"
-  box86_rpi_build_flag="-DRPI$(grep -Po 'Raspberry Pi \K[[:digit:]+](?= Model)' /proc/cpuinfo)=1"
-  echo "Building box86 with ${box86_rpi_build_flag} ..."
-  cmake . "${box86_rpi_build_flag}" -DCMAKE_BUILD_TYPE=RelWithDebInfo
-  make -j$(nproc)
-  sudo make install
-  sudo systemctl restart systemd-binfmt
-  cd "${script_dir}"
+# Reset swap file
+source /etc/dphys-swapfile
+if [ $CONF_SWAPSIZE -gt $conf_swapsize_orig ]; then 
+  echo "Reverting swap file to original size of ${conf_swapsize_orig} MB"
+  set_swap_file_size $conf_swapsize_orig
 else
-  echo "Skipping box86 build. Already built"
+  echo "Keeping existing swap file size ${CONF_SWAPSIZE}"
 fi
 
 # Let's grab badown to help us download MGPR from mediafire
@@ -98,7 +219,7 @@ if [[ ! -d "${badown_dir}" ]]; then
   mkdir -p "${badown_dir}"
   git -c advice.detachedHead=false clone --depth=1 -b "${badown_ver}" "${badown_repo}" "${badown_dir}"
 else
-  echo "badown has laready been downloaded"
+  echo "badown has already been downloaded"
 fi
 
 # Let's grab Monaco GP Remake
@@ -115,22 +236,24 @@ if [[ ! -d "${mgpr_dest_dir}" ]]; then
   tar -xf "${mgpr_tar_gz_dest}" --strip-components=1 --directory "${mgpr_dest_dir}"
   #rm "${mgpr_tar_gz_dest}"
 fi
+echo "Using ${mgpr_linux_build_dir} version of mgpr and ${deb_pkg_arch} architecture debian packages"
 if [[ ! -f "${mgpr_dest_dir}/mgpr" ]]; then
-  cp "${mgpr_dest_dir}/linux_builds/static_32bit/mgpr" "${mgpr_dest_dir}/"
+  cp "${mgpr_dest_dir}/linux_builds/${mgpr_linux_build_dir}/mgpr" "${mgpr_dest_dir}/"
 fi
 if [[ $(ls -l "${mgpr_dest_dir}"/*.so* | wc -l) -eq 0 ]]; then
-  echo "Fetching i386 pkg dependencies for mgpr"
+  echo "Fetching ${deb_pkg_arch} pkg dependencies for mgpr"
   mkdir -p "${mgpr_dest_dir}"/debs
-  declare -a pkgs_i386=(\
-    "http://${debian_package_mirror}pool/main/libd/libdumb/libdumb1_0.9.3-6+b3_i386.deb"\
-    "http://${debian_package_mirror}pool/main/f/flac/libflac8_1.3.3-2+deb11u1_i386.deb"\
-    "http://${debian_package_mirror}pool/main/libv/libvorbis/libvorbisfile3_1.3.7-1_i386.deb"\
-    "http://${debian_package_mirror}pool/main/o/openal-soft/libopenal1_1.19.1-2_i386.deb"\
-    "http://${debian_package_mirror}pool/main/s/sndio/libsndio7.0_1.5.0-3_i386.deb"\
-    "http://${debian_package_mirror}pool/main/libb/libbsd/libbsd0_0.11.3-1_i386.deb"\
-    "http://${debian_package_mirror}pool/main/libm/libmd/libmd0_1.0.3-3_i386.deb"
+  declare -a deb_pkgs=(\
+    "http://${debian_package_mirror}pool/main/libd/libdumb/libdumb1_0.9.3-6+b3_${deb_pkg_arch}.deb"\
+    "http://${debian_package_mirror}pool/main/f/flac/libflac8_1.3.3-2+deb11u1_${deb_pkg_arch}.deb"\
+    "http://${debian_package_mirror}pool/main/libv/libvorbis/libvorbisfile3_1.3.7-1_${deb_pkg_arch}.deb"\
+    "http://${debian_package_mirror}pool/main/o/openal-soft/libopenal1_1.19.1-2_${deb_pkg_arch}.deb"\
+    "http://${debian_package_mirror}pool/main/s/sndio/libsndio7.0_1.5.0-3_${deb_pkg_arch}.deb"\
+    "http://${debian_package_mirror}pool/main/libb/libbsd/libbsd0_0.11.3-1_${deb_pkg_arch}.deb"\
+    "http://${debian_package_mirror}pool/main/libm/libmd/libmd0_1.0.3-3_${deb_pkg_arch}.deb" \
+    "http://security.ubuntu.com/ubuntu/pool/main/libj/libjpeg-turbo/libjpeg-turbo8_1.5.2-0ubuntu5.18.04.6_${deb_pkg_arch}.deb"
    )
-  for pkg in "${pkgs_i386[@]}"; do
+  for pkg in "${deb_pkgs[@]}"; do
     wget -P "${mgpr_dest_dir}"/debs "${pkg}"
   done
   for deb in "${mgpr_dest_dir}"/debs/*; do
@@ -139,7 +262,7 @@ if [[ $(ls -l "${mgpr_dest_dir}"/*.so* | wc -l) -eq 0 ]]; then
   find "${mgpr_dest_dir}/debs" -name *.so* -print0 | xargs -0 mv -t "${mgpr_dest_dir}"
   rm -rf "${mgpr_dest_dir}"/debs
 else 
-  echo "i386 pkg dependencies for mgpr have already been fetched"
+  echo "${deb_pkg_arch} pkg dependencies for mgpr have already been fetched"
 fi
 
 # Create .xinitrc for launching mgpr from CLI

@@ -15,9 +15,9 @@ Since the Raspberry Pi uses an ARM CPU, the game will not run on Raspberry Pi OS
 
 Since source code is not available, I decided to see if it was possible to use emulation to run the
 game on a Pi, and was delighted to discover that it is indeed possible, thanks in a large part to the magic of
-[box86](https://github.com/ptitSeb/box86).
+[box86](https://github.com/ptitSeb/box86) and [box64](https://github.com/ptitSeb/box64).
 
-The process of getting it running was still not simple though, due to the requirement to hunt down x86 versions of
+The process of getting it running was still not simple though, due to the requirement to hunt down x86/x64 versions of
 several libraries that the game depended on, but are not yet natively 'wrapped' by box86.
 Also, the game requires X11, and whilst that means it will run fine in the Desktop version of Raspberry Pi OS,
 I wanted to run it from the CLI, which is possible using [xinit](https://en.wikipedia.org/wiki/Xinit) but
@@ -29,10 +29,10 @@ amazing game on their Pis.
 ## Limitations ##
 
 * Only Raspberry Pi 2, 3 & 4 models are currently supported with 1GB or more of RAM.
-The original Pi and Pi Zero use an ARM chip that cannot be used by box86's 'DynaRec' (dynamic recompiler)
+The original Pi and Pi Zero use an ARM chip that is not supported by box86's 'DynaRec' (dynamic recompiler)
 so performance would suffer.
-The Pi Zero 2 may work, but the 512 MB RAM is likely to be a problem building box86 and I don't have one to test on.
-* Currently this script supports only 32-bit versions of Raspberry Pi OS.
+The Pi Zero 2 may work, but the 512 MB RAM is likely to be a problem building box86/box64 and I don't have one to test on.
+* box64 build is unstable on devices with < 2GB RAM (e.g. RPi3). You may want to use a 32-bit OS for these devices.
 * It has only been tested against the 'Bullseye' release.
 * It requires the use of the KMS GL driver to get playable performance.
 
@@ -41,8 +41,8 @@ The Pi Zero 2 may work, but the 512 MB RAM is likely to be a problem building bo
 This script necessarily makes use of [`sudo`](https://en.wikipedia.org/wiki/Sudo)
 for some operations.
 Some of these will make changes to your Pi that you may not want and/or may break other software.
-e.g. it will increase the size of the
-[swap file](https://www.linux.com/news/all-about-linux-swap-space/) if it's less than 1GB.
+e.g. it may increase the size of the
+[swap file](https://www.linux.com/news/all-about-linux-swap-space/).
 
 I do not claim to be an expert in Linux/Raspberry Pi OS. This works for me, but I am unable to test this script with every combination of hardware & software environment.
 It's possible that I have made an error that will cause unrecoverable damage to your Pi system image and leave it 'bricked'.
@@ -63,7 +63,7 @@ The following steps should be done **BEFORE** using the script to prepare your P
 These assume a fresh install of Raspberry Pi OS 'Bullseye' Lite edition.
 Your Pi must also have internet access for this whole process.
 
-1. If your Pi has 1GB of RAM or less (all Pis pre v4), reduce the GPU share to 64MB:
+1. If your Pi has 1GB of RAM or less (all Pis pre v4), reduce the GPU share to 16 MB:
 
      `sudo raspi-config` -> Performance Options -> GPU Memory
 
@@ -77,7 +77,8 @@ Your Pi must also have internet access for this whole process.
 
      `sudo raspi-config` -> Advanced Options -> GL Driver -> (Full KMS)
 
-     (You probably want 'Fake KMS' if running on 'Buster' but this hasn't been thoroughly tested)
+     This option might not be present on latest Bullseye since KMS is enabled by default now. 
+     You probably want 'Fake KMS' if running on 'Buster' but this hasn't been thoroughly tested.
 
 4. (Optional) Enable SSH if you want to and know how to use it!
 
@@ -119,7 +120,8 @@ You may also want to change `debian_package_mirror` to a
 ./install_mgpr_pi
 ```
 
-Wait for the script to finish. It will take some time as box86 takes a while to build.
+Wait for the script to finish. It will take some time as box86/box64 take a while to build,
+especially if you have less than 4GB of RAM where only one core witll be used.
 
 ### Post-install ###
 
@@ -128,16 +130,6 @@ After installation, you'll probably want to reset your GPU memory to 128MB or 25
 Another reboot is also advised.
 
 ## Running MGPR ##
-
-### Running under the X11 Desktop ###
-
-If you're using the full Desktop version of Raspberry Pi OS, you should just be able to launch the `mgpr` executable
-from the `mgpr_v1_4_6_linux` directory directly. e.g. from a new Terminal window:
-
-```shell
-cd mgpr_v1_4_6_linux
-./mgpr
-```
 
 ### Running from CLI mode ###
 
@@ -158,18 +150,37 @@ the game needs to run under `xinit`. The install script generated two files to e
 ~/bin/mgpr.sh
 ```
 
+### Running under the X11 Desktop ###
+
+If you're using the full Desktop version of Raspberry Pi OS, you should just be able to launch the `mgpr` executable
+from the `mgpr_v1_4_6_linux` directory directly. e.g. from a new Terminal window:
+
+```shell
+cd mgpr_v1_4_6_linux
+./mgpr
+```
+
+The convenience script should also work since it will detect the X11 $DISPLAY
+
+```shell
+~/bin/mgpr.sh
+```
+
 ## Known Issues ##
 
-1. Some characters may be missing from the text in the intro screen and also in the
-banner text for 'time', 'score' etc in the game.
+1. On the 32-bit install only, some characters may be missing from the text in the intro screen
+and also in the menu and banner text for 'time', 'score' etc in the game.
 I'm not sure what causes this but it's something to do with the KMS rendering pipeline
 since it doesn't happen with the 'Legacy' GL driver, but the game is unbearably slow
 under that driver without full GL acceleration support.
 
+2. On systems with less than 2 GB RAM the box86/box64 builds may fail due to memory exhaustion.
+If this happens you can usually just start the script again.
+
 ## Troubleshooting ##
 
 If the installation succeeds but the game doesn't run, try running it directly but prefixing
-the command with `BOX86_LOG=1`. This will cause box86 to spit put lots of debug info that
+the command with `BOX86_LOG=1` (`BOX64_LOG=1` on 64-bit systems). This will cause box86 to spit put lots of debug info that
 may be helpful in resolving the issue. e.g.
 
 ```shell
@@ -179,11 +190,9 @@ BOX86_LOG=1 ./mgpr
 
 ## TODO: ##
 
-1. Add support for box86 under 64-bit Raspberry Pi OS.
-2. Try using [box64](https://github.com/ptitSeb/box64) on 64-bit OS using the x64 Linux `mgpr` binary.
-3. Make configuration more friendly. Perhaps interactive?
-4. Add support for Pi Zero 2 by building box86 for RPi3 and/or forking box86 to add (-DRPIZ2) support.
-5. Dynamically adjust the `make -j` argument to take into account available RAM.
+1. Make configuration more friendly. Perhaps interactive?
+2. Add support for Pi Zero 2 by building box86 for RPi3 and/or forking box86 to add (-DRPIZ2) support.
+3. Build & host prebuilt `.deb` package builds for box86 & box64 to save time and build/RAM issues.
 
 ## Contributing ##
 
