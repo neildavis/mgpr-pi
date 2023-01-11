@@ -63,7 +63,7 @@ The following steps should be done **BEFORE** using the script to prepare your P
 These assume a fresh install of Raspberry Pi OS 'Bullseye' Lite edition.
 Your Pi must also have internet access for this whole process.
 
-1. If your Pi has 1GB of RAM or less (all Pis pre v4), reduce the GPU share to 16 MB:
+1. If your Pi has less than 4 GB of RAM (all Pis pre v4 and some v4s), reduce the GPU share to 16 MB:
 
      `sudo raspi-config` -> Performance Options -> GPU Memory
 
@@ -125,7 +125,7 @@ especially if you have less than 4GB of RAM where only one core witll be used.
 
 ### Post-install ###
 
-After installation, you'll probably want to reset your GPU memory to 128MB or 256MB using `raspi-config` if you reduced it earlier.
+After installation, you'll probably want to reset your GPU memory to 64+ MB using `raspi-config` if you reduced it earlier.
 
 Another reboot is also advised.
 
