@@ -56,8 +56,8 @@ mgpr_cfg_playfield_height=480 # if TATE mode is applied this will become width
 mgpr_cfg_playfield_pos_x=80   # if TATE mode is applied this will become y pos
 mgpr_cfg_playfield_pos_y=0    # if TATE mode is applied this will become x pos
 # These lines affect the .xinitrc file generated to run mgpr under X11 from the CLI console. 
-mgpr_display_output_id="DSI-1" # Change to 'DSI-1' if using DSI display (e.g. official 7" touch screen)
-mgpr_display_rotate="inverted"    # Change to 'inverted' to rotate the screen 180 degrees in TATE mode.
+mgpr_display_output_id="HDMI-1" # Change to 'DSI-1' if using DSI display (e.g. official 7" touch screen)
+mgpr_display_rotate="normal"    # Change to 'inverted' to rotate the screen 180 degrees in TATE mode.
 
 
 # Helper func to determine if we're running on a 64-bit system
