@@ -4,6 +4,15 @@
 
 [![Video](https://img.youtube.com/vi/LI3msMjCAkY/maxresdefault.jpg)](https://www.youtube.com/watch?v=LI3msMjCAkY)
 
+## STATUS: OBSOLETE ##
+
+Since I developed this script I have had the opportunity to work with Ben to develop a fully native version of MGPr
+for the latest Raspberry Pi OS which, as well as a slew of additional updates, will run with superior performance
+Please see the [MGPr homepage](https://forum.arcadecontrols.com/index.php?topic=134445.0) for more details.
+
+This project now is useful ONLY as a study/example of how to run x86/x64 binaries on ARM architecture devices like
+the Raspberry Pi using user space emulation tools like box86/box64.
+
 ## Overview ##
 
 This repo contains a shell script to automate installation of Ben Geeves' amazing
